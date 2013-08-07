@@ -33,16 +33,6 @@
 
  */
 
-/**
- *
- user: user who entered the room
- in_fanclub: is the user in the broadcaster’s fan club
- has_tokens: does the user have at least 1 token
- is_mod: is the user a moderator
- tipped_recently: is the user a “dark blue”?
- gender: “m” (male), “f” (female), “s” (shemale), or “c” (couple)
-
- */
 function ObjectUserList() {
 
     this.list = [];
@@ -52,6 +42,17 @@ function ObjectUserList() {
     this.sortBy = sortBy;
     this.tipped = tipped;
     this.message = message;
+
+    // From http://stackoverflow.com/questions/979256/sorting-an-array-of-javascript-objects
+    this.sort_by = function(field, reverse, primer){
+
+        var key = function (x) {return primer ? primer(x[field]) : x[field]};
+
+        return function (a,b) {
+            var A = key(a), B = key(b);
+            return ((A < B) ? -1 : (A > B) ? +1 : 0) * [-1,1][+!!reverse];
+        }
+    };
 
     function add (userToAdd, delay) {
 
@@ -64,15 +65,15 @@ function ObjectUserList() {
             this.list.push(new ObjectUser(userToAdd));
         } else { // User exists, so update some stuff
             var d = new Date();
-            if ( (d.getTime() - t.firstSeen.getTime())/60000 >= delay ){
+            if ( this.away && (d.getTime() - t.firstSeen.getTime())/1000 >= delay ){
                 this.list.splice(this.list.indexOf(t),1);
                 this.list.push(new ObjectUser(userToAdd)); // yeah, yeah, this could be done in the splice
             } else {
                 t.away = false; // User must not be away
-                t.in_fanclub = user['in_fanclub'];
-                t.has_tokens = user['has_tokens'];
-                t.is_mod = user['is_mod'];
-                t.tipped_recently = user['tipped_recently'];
+                t.in_fanclub = userToAdd['in_fanclub'];
+                t.has_tokens = userToAdd['has_tokens'];
+                t.is_mod = userToAdd['is_mod'];
+                t.tipped_recently = userToAdd['tipped_recently'];
             }
         }
     }
@@ -97,15 +98,40 @@ function ObjectUserList() {
 
     }
 
-    function sortBy(sortKey) {
+    function sortBy(sortKey, ascending, primer) {
+
+        this.list.sort(this.sort_by(sortKey, ascending, primer));
 
     }
 
     function tipped(tip) {
 
+        var t = this.get(tip['from_user']);
+
+        t.away = false;
+        t.in_fanclub = tip['from_user_in_fanclub'];
+        t.has_tokens = tip['from_user_has_tokens'];
+        t.is_mod = tip['from_user_is_mod'];
+        t.tipped_recently = tip['from_user_tipped_recently'];
+
+        t.tipCount++;
+        t.tipTotal += tip['amount'];
+        t.tipAvg = t.tipTotal / t.tipCount;
+
     }
 
     function message(msg) {
+
+        var t = this.get(msg['user']);
+
+        t.away = false; // User must not be away
+        t.in_fanclub = msg['in_fanclub'];
+        t.has_tokens = msg['has_tokens'];
+        t.is_mod = msg['is_mod'];
+        t.tipped_recently = msg['tipped_recently'];
+
+        t.chatCount++;
+        t.lastChat = msg['m'];
 
     }
 
@@ -130,6 +156,7 @@ function ObjectUser (user) {
 
     this.tipCount = 0;
     this.tipTotal = 0;
+    this.tipAvg = 0;
 
     this.chatCount = 0;
     this.lastChat = "";
